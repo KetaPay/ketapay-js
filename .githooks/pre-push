@@ -1,0 +1,11 @@
+#!/bin/sh
+# Runs before every `git push` and refuses the push if a check fails, so broken code never reaches a PR.
+# Installed by `npm install` (the prepare script points git at .githooks). The package smoke test and the
+# browser E2E are left to CI to keep this under a minute.
+set -e
+echo "pre-push: formatting, lint, types, unit tests"
+npm run --silent format:check
+npm run --silent lint
+npm run --silent typecheck
+npm test --silent -- --reporter=dot
+echo "pre-push: all checks passed"
