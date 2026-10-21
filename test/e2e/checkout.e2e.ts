@@ -30,7 +30,8 @@ async function openShop(page: Page, url: string) {
     window.result = window.KetaPay.open({
       url,
       onReady: () => window.events.push('ready'),
-      onPaid: () => window.events.push('paid'),
+      onSuccess: () => window.events.push('success'),
+      onError: (error) => window.events.push(`error:${error.code}`),
       onClose: () => window.events.push('closed'),
     }).result
   }, url)
@@ -48,7 +49,7 @@ test('[BE2E-001] a session created with a test key opens in the overlay and says
   await expect.poll(() => events(page)).toEqual(['ready'])
 })
 
-test('[BE2E-002] paying in the sandbox fires paid and completes the session', async ({ page }) => {
+test('[BE2E-002] paying in the sandbox fires onSuccess and completes the session', async ({ page }) => {
   const session = await createSession()
   await openShop(page, session.url)
   await expect.poll(() => events(page)).toContain('ready')
@@ -58,8 +59,8 @@ test('[BE2E-002] paying in the sandbox fires paid and completes the session', as
   await frame.getByRole('button', { name: 'Proceed' }).click()
   await frame.getByRole('button', { name: /sent the money/ }).click()
 
-  await expect.poll(() => events(page)).toContain('paid')
-  expect(await result(page)).toBe('paid')
+  await expect.poll(() => events(page)).toContain('success')
+  expect(await result(page)).toBe('success')
   await expect.poll(async () => (await getSession(session.id)).status).toBe('complete')
 })
 
@@ -99,4 +100,13 @@ test('[BE2E-005] on a phone the overlay fills the screen and the pay button can 
   await pay.scrollIntoViewIfNeeded()
   const box = await pay.boundingBox()
   expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height)
+})
+
+test('[BE2E-006] a checkout url with an unknown token fires onError with load_failed and closes', async ({ page }) => {
+  const session = await createSession()
+  // The same checkout origin, but a token that was never issued: the page that loads never says ready.
+  await openShop(page, session.url.replace(/[^/]+$/, 'cs_test_never_issued'))
+  await expect.poll(() => events(page), { timeout: 20_000 }).toEqual(['error:load_failed', 'closed'])
+  await expect(overlay(page)).toHaveCount(0)
+  expect(await result(page)).toBe('error')
 })

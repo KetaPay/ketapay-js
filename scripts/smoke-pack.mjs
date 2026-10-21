@@ -111,7 +111,7 @@ console.log(version)`,
   writeFileSync(
     join(app, 'shop.ts'),
     `import { KetaPay, KetaPayCheckoutError, open, type CheckoutHandle, type CheckoutResult } from '@ketapay/checkout'
-const handle: CheckoutHandle = open({ url: '${CHECKOUT_URL}', onReady() {}, onPaid() {}, onClose() {} })
+const handle: CheckoutHandle = open({ url: '${CHECKOUT_URL}', onReady() {}, onSuccess() {}, onError(error) { void error.code }, onClose() {} })
 const result: Promise<CheckoutResult> = handle.result
 KetaPay.open({ url: '${CHECKOUT_URL}' }).close()
 export const isOurs = (e: unknown) => e instanceof KetaPayCheckoutError && e.code === 'invalid_url'
