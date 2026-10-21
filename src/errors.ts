@@ -1,6 +1,9 @@
-export type KetaPayCheckoutErrorCode = 'invalid_url' | 'not_in_browser'
+export type KetaPayCheckoutErrorCode = 'invalid_url' | 'not_in_browser' | 'load_failed'
 
-/** Thrown by `open` before anything is added to the page. Branch on `code`. */
+/**
+ * Thrown by `open` before anything is added to the page (`invalid_url`, `not_in_browser`), or passed to
+ * `onError` when the checkout doesn't load (`load_failed`). Branch on `code`.
+ */
 export class KetaPayCheckoutError extends Error {
   readonly code: KetaPayCheckoutErrorCode
 

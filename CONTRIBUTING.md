@@ -51,7 +51,7 @@ New scenario: add the row in the documentation repo first, `npm run sync-catalog
 
 ## End-to-end tests
 
-`test/e2e/` drives Chromium, WebKit and an iPhone-sized WebKit through Playwright. Each test creates a fresh checkout session on the API with a sandbox key, serves a one-line shop page that loads `dist/checkout.js`, opens the checkout and checks what a business would see: `ready`, a test payment firing `paid`, closing, closed sessions, the phone layout.
+`test/e2e/` drives Chromium, WebKit and an iPhone-sized WebKit through Playwright. Each test creates a fresh checkout session on the API with a sandbox key, serves a one-line shop page that loads `dist/checkout.js`, opens the checkout and checks what a business would see: `ready`, a test payment firing `onSuccess`, closing, closed sessions, an unknown token firing `onError`, the phone layout.
 
 Settings: `KETAPAY_E2E_BASE_URL` and `KETAPAY_E2E_SECRET_KEY` (see `test/e2e/env.ts`). The checkout URL the API returns must be reachable from the machine running the browsers. Run `npm run build` first, then `npm run test:e2e`.
 

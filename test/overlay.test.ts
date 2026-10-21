@@ -47,12 +47,12 @@ describe('the overlay', () => {
   })
 
   it('[UI-002] a message after closing does nothing', () => {
-    const onPaid = vi.fn()
-    const handle = openCheckout({ onPaid })
+    const onSuccess = vi.fn()
+    const handle = openCheckout({ onSuccess })
     const target = frame().contentWindow
     handle.close()
     post(event('paid'), { from: target })
-    expect(onPaid).not.toHaveBeenCalled()
+    expect(onSuccess).not.toHaveBeenCalled()
   })
 
   it('[UI-003] locks page scroll while open and restores it exactly', () => {

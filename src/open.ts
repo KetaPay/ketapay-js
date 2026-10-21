@@ -2,15 +2,20 @@ import { KetaPayCheckoutError } from './errors.js'
 import { checkoutTarget } from './origins.js'
 import { createOverlay, PHONE_QUERY } from './overlay.js'
 
-export type CheckoutResult = 'paid' | 'closed'
+export type CheckoutResult = 'success' | 'closed' | 'error'
 
 export interface CheckoutOptions {
   /** The `url` of a checkout session your server created with its secret key. */
   url: string
   /** The checkout has loaded and is showing. */
   onReady?: () => void
-  /** The buyer paid. The checkout stays open on its receipt until they close it (or you call `close()`). */
-  onPaid?: () => void
+  /**
+   * The buyer paid into escrow. The checkout stays open on its receipt until they close it (or you call
+   * `close()`). Confirm the payment on your server (the `escrow.funded` webhook) before you ship anything.
+   */
+  onSuccess?: () => void
+  /** The checkout didn't load (`code` is `load_failed`). The overlay has closed; `onClose` follows. */
+  onError?: (error: KetaPayCheckoutError) => void
   /** The checkout closed, whether or not the buyer paid. */
   onClose?: () => void
 }
@@ -18,15 +23,19 @@ export interface CheckoutOptions {
 export interface CheckoutHandle {
   /** Closes the checkout. Safe to call more than once. */
   close(): void
-  /** Resolves once: `'paid'` as soon as the buyer pays, otherwise `'closed'` when the checkout closes. */
+  /**
+   * Resolves once: `'success'` as soon as the buyer pays, `'error'` if the checkout doesn't load, otherwise
+   * `'closed'` when the checkout closes.
+   */
   result: Promise<CheckoutResult>
 }
 
 type CheckoutMessage = { source: 'ketapay-checkout'; type: 'ready' | 'paid' | 'closed'; token: string }
 
-// If the checkout never says `ready` (an old page, a network error page), show the frame anyway
-// shortly after it loads, so the buyer isn't left looking at a spinner.
-const REVEAL_AFTER_LOAD_MS = 400
+// A KetaPay checkout always says `ready`. If the frame loads something that doesn't (an unknown token,
+// a network error page), or nothing loads at all, the checkout failed: close it and tell `onError`.
+const READY_AFTER_LOAD_MS = 8_000
+const LOAD_TIMEOUT_MS = 30_000
 
 let current: CheckoutHandle | null = null
 
@@ -49,6 +58,8 @@ export function open(options: CheckoutOptions): CheckoutHandle {
   let ready = false
   let paid = false
   let closed = false
+  let readyTimer: ReturnType<typeof setTimeout> | undefined
+  const loadTimer = setTimeout(fail, LOAD_TIMEOUT_MS)
 
   const media = window.matchMedia?.(PHONE_QUERY)
   const onLayout = () => overlay.layout(Boolean(media?.matches))
@@ -58,14 +69,15 @@ export function open(options: CheckoutOptions): CheckoutHandle {
     if (data?.source !== 'ketapay-checkout' || data.token !== token) return
     if (data.type === 'ready' && !ready) {
       ready = true
+      clearTimers()
       overlay.reveal()
       overlay.hideCloseButton()
       if (document.activeElement === closeButton) iframe.focus()
       call(options.onReady)
     } else if (data.type === 'paid' && !paid) {
       paid = true
-      settle('paid')
-      call(options.onPaid)
+      settle('success')
+      call(options.onSuccess)
     } else if (data.type === 'closed') {
       close()
     }
@@ -75,7 +87,29 @@ export function open(options: CheckoutOptions): CheckoutHandle {
   const onFocus = (event: FocusEvent) => {
     if (!root.contains(event.target as Node)) (ready ? iframe : closeButton).focus()
   }
-  const onLoad = () => setTimeout(() => !closed && overlay.reveal(), REVEAL_AFTER_LOAD_MS)
+  // Once something has loaded, it has READY_AFTER_LOAD_MS to say ready, whatever the overall timeout says.
+  // Restarted on every load, so a checkout page that reloads itself gets the full time again.
+  const onLoad = () => {
+    if (ready) return
+    clearTimers()
+    readyTimer = setTimeout(fail, READY_AFTER_LOAD_MS)
+  }
+
+  function clearTimers() {
+    clearTimeout(loadTimer)
+    clearTimeout(readyTimer)
+  }
+
+  function fail() {
+    if (ready || closed) return
+    settle('error')
+    const error = new KetaPayCheckoutError(
+      'load_failed',
+      'The KetaPay checkout did not load. Check the session url, or try again: the network may be down.',
+    )
+    call(() => options.onError?.(error))
+    close()
+  }
 
   const previousFocus = document.activeElement as HTMLElement | null
   const scroll = [document.documentElement.style.overflow, document.body.style.overflow] as const
@@ -83,6 +117,7 @@ export function open(options: CheckoutOptions): CheckoutHandle {
   function close() {
     if (closed) return
     closed = true
+    clearTimers()
     window.removeEventListener('message', onMessage)
     window.removeEventListener('keydown', onKey)
     document.removeEventListener('focusin', onFocus)
