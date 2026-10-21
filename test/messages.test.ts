@@ -3,18 +3,18 @@ import { closeButton, event, frame, openCheckout, overlay, post, spinner } from 
 
 describe('messages from the checkout', () => {
   it('[MSG-001] ignores messages from any other origin', () => {
-    const onPaid = vi.fn()
-    openCheckout({ onPaid })
+    const onSuccess = vi.fn()
+    openCheckout({ onSuccess })
     post(event('paid'), { origin: 'https://evil.example' })
     post(event('paid'), { origin: 'https://checkout-staging.ketapay.com' })
-    expect(onPaid).not.toHaveBeenCalled()
+    expect(onSuccess).not.toHaveBeenCalled()
   })
 
   it('[MSG-001] ignores messages from another window, even with the right origin', () => {
-    const onPaid = vi.fn()
-    openCheckout({ onPaid })
+    const onSuccess = vi.fn()
+    openCheckout({ onSuccess })
     post(event('paid'), { from: window })
-    expect(onPaid).not.toHaveBeenCalled()
+    expect(onSuccess).not.toHaveBeenCalled()
   })
 
   it.each([
@@ -25,11 +25,11 @@ describe('messages from the checkout', () => {
     ['a string', 'paid'],
     ['nothing', null],
   ])('[MSG-002] ignores %s', async (_, data) => {
-    const onPaid = vi.fn()
+    const onSuccess = vi.fn()
     const onClose = vi.fn()
-    openCheckout({ onPaid, onClose })
+    openCheckout({ onSuccess, onClose })
     post(data)
-    expect(onPaid).not.toHaveBeenCalled()
+    expect(onSuccess).not.toHaveBeenCalled()
     expect(onClose).not.toHaveBeenCalled()
     expect(overlay()).not.toBeNull()
   })
@@ -49,33 +49,24 @@ describe('messages from the checkout', () => {
     expect(closeButton().style.display).toBe('none')
   })
 
-  it('[MSG-003] shows the checkout shortly after it loads, even if it never says ready', () => {
-    vi.useFakeTimers()
-    openCheckout()
-    frame().dispatchEvent(new Event('load'))
-    vi.advanceTimersByTime(400)
-    expect(spinner()).toBeNull()
-    expect(frame().style.opacity).toBe('1')
-  })
-
-  it('[MSG-004] paid calls onPaid once and resolves the result, however often it arrives', async () => {
-    const onPaid = vi.fn()
-    const handle = openCheckout({ onPaid })
+  it('[MSG-004] paid calls onSuccess once and resolves the result, however often it arrives', async () => {
+    const onSuccess = vi.fn()
+    const handle = openCheckout({ onSuccess })
     post(event('paid'))
     post(event('paid'))
-    expect(onPaid).toHaveBeenCalledOnce()
-    await expect(handle.result).resolves.toBe('paid')
+    expect(onSuccess).toHaveBeenCalledOnce()
+    await expect(handle.result).resolves.toBe('success')
     // The receipt stays on screen until the buyer closes it.
     expect(overlay()).not.toBeNull()
   })
 
-  it('[MSG-004] stays paid when the buyer then closes the receipt', async () => {
+  it('[MSG-004] stays a success when the buyer then closes the receipt', async () => {
     const onClose = vi.fn()
     const handle = openCheckout({ onClose })
     post(event('paid'))
     post(event('closed'))
     expect(onClose).toHaveBeenCalledOnce()
-    await expect(handle.result).resolves.toBe('paid')
+    await expect(handle.result).resolves.toBe('success')
   })
 
   it('[MSG-005] closed from the page closes the overlay, calls onClose once and resolves closed', async () => {
@@ -92,8 +83,8 @@ describe('messages from the checkout', () => {
   it('[MSG-006] a callback that throws still lets the overlay close and the result resolve', async () => {
     vi.useFakeTimers()
     const handle = openCheckout({
-      onPaid: () => {
-        throw new Error('shop bug in onPaid')
+      onSuccess: () => {
+        throw new Error('shop bug in onSuccess')
       },
       onClose: () => {
         throw new Error('shop bug in onClose')
@@ -102,8 +93,8 @@ describe('messages from the checkout', () => {
     post(event('paid'))
     post(event('closed'))
     expect(overlay()).toBeNull()
-    await expect(handle.result).resolves.toBe('paid')
+    await expect(handle.result).resolves.toBe('success')
     // Each error is re-thrown on its own, so it still shows in the console.
-    expect(() => vi.runOnlyPendingTimers()).toThrow('shop bug in onPaid')
+    expect(() => vi.runOnlyPendingTimers()).toThrow('shop bug in onSuccess')
   })
 })

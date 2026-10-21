@@ -8,7 +8,7 @@ Using React? [`@ketapay/react`](https://github.com/KetaPay/ketapay-react) wraps 
 
 1. **Your server** creates a checkout session with your secret key (through [`@ketapay/node`](https://github.com/KetaPay/ketapay-node), [`ketapay/ketapay-php`](https://github.com/KetaPay/ketapay-php) or the API) and sends its `url` to the page.
 2. **Your page** calls `KetaPay.open({ url })`. The checkout opens over your page: a centred window on a computer, the whole screen on a phone.
-3. The buyer pays. You get `onPaid`, and the `escrow.funded` webhook on your server. Trust the webhook (or fetch the session) before you ship anything: a browser callback can't prove a payment.
+3. The buyer pays. You get `onSuccess`, and the `escrow.funded` webhook on your server. Trust the webhook (or fetch the session) before you ship anything: a browser callback can't prove a payment.
 
 Your secret key never goes to the browser, and this library takes no keys at all.
 
@@ -37,20 +37,21 @@ payButton.addEventListener('click', async () => {
   KetaPay.open({
     url,
     onReady: () => {}, // the checkout is showing
-    onPaid: () => showThankYou(), // the buyer paid; the receipt stays up until they close it
+    onSuccess: () => showThankYou(), // the buyer paid; the receipt stays up until they close it
+    onError: (error) => showMessage('Checkout could not load. Please try again.'), // see Errors
     onClose: () => {}, // closed, paid or not
   })
 })
 ```
 
-`open` returns `{ close, result }`. `result` resolves once, to `'paid'` as soon as the buyer pays, or `'closed'` if they close it first:
+`open` returns `{ close, result }`. `result` resolves once: to `'success'` as soon as the buyer pays, `'error'` if the checkout doesn't load, or `'closed'` if they close it first:
 
 ```js
 const checkout = KetaPay.open({ url })
-if ((await checkout.result) === 'paid') window.location.href = '/orders'
+if ((await checkout.result) === 'success') window.location.href = '/orders'
 ```
 
-Call `checkout.close()` to close it yourself, for example straight after `onPaid` if you'd rather show your own receipt.
+Call `checkout.close()` to close it yourself, for example straight after `onSuccess` if you'd rather show your own receipt.
 
 ## Branding
 
@@ -58,12 +59,13 @@ The checkout shows your business's logo and colour from your KetaPay settings. T
 
 ## Errors
 
-`open` throws a `KetaPayCheckoutError` before anything is shown, with a `code`:
+Every error is a `KetaPayCheckoutError` with a `code`. Mistakes in the call are thrown by `open` before anything is shown; a checkout that doesn't load goes to `onError`:
 
-| Code             | When                                                                                    |
-| ---------------- | --------------------------------------------------------------------------------------- |
-| `invalid_url`    | The `url` isn't a KetaPay checkout. Pass the session's `url` exactly as the API gave it |
-| `not_in_browser` | Called during server rendering. Call it from a click handler or an effect               |
+| Code             | How you get it | When                                                                                                                                                |
+| ---------------- | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `invalid_url`    | thrown         | The `url` isn't a KetaPay checkout. Pass the session's `url` exactly as the API gave it                                                             |
+| `not_in_browser` | thrown         | Called during server rendering. Call it from a click handler or an effect                                                                           |
+| `load_failed`    | `onError`      | The checkout didn't load: an unknown or mistyped session, or the buyer's network. The overlay closes, then `onClose` runs and `result` is `'error'` |
 
 Opening a second checkout while one is showing returns the one already open.
 

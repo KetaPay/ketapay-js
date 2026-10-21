@@ -1,5 +1,5 @@
 <!-- GENERATED: do not edit. Copied from documentation/openapi/public by `npm run sync-catalogue`. -->
-<!-- sha256: 627d0d99beb580c7e37d8e4eb9254bebd2d4a651eea8f0d8d07c27fcd05a2bd4 -->
+<!-- sha256: c331eb5bfc0cece05e9151cbd9b6b08b5b2b51f0e6dafee1394040165219b00a -->
 
 # KetaPay browser SDK test catalogue
 
@@ -23,9 +23,11 @@ Layers: **unit** (jsdom, a fake checkout frame, no network), **package** (the pa
 | MSG-001 | unit | Messages from any origin other than the frame's are ignored |
 | MSG-002 | unit | Messages without `source: 'ketapay-checkout'`, with an unknown `type` or for another `token` are ignored |
 | MSG-003 | unit | `ready` calls `onReady` and removes the SDK's own loader |
-| MSG-004 | unit | `paid` calls `onPaid` once and resolves `result` to `'paid'`, however many times the message arrives |
+| MSG-004 | unit | `paid` calls `onSuccess` once and resolves `result` to `'success'`, however many times the message arrives |
 | MSG-005 | unit | `closed` from the page closes the overlay, calls `onClose` once and resolves `result` to `'closed'` |
 | MSG-006 | unit | A callback that throws doesn't stop the overlay from closing or `result` from resolving |
+| MSG-007 | unit | If the frame loads but `ready` doesn't arrive in time, or nothing loads in time, the overlay closes, `onError` is called once with a `KetaPayCheckoutError` whose `code` is `load_failed`, then `onClose`, and `result` resolves to `'error'` |
+| MSG-008 | unit | Once `ready` has arrived, or after the overlay is closed, no `load_failed` is reported |
 
 ## UI: the overlay
 
@@ -46,6 +48,7 @@ Layers: **unit** (jsdom, a fake checkout frame, no network), **package** (the pa
 | RCT-002 | unit | `<KetaPayButton>` opens the checkout on click and passes its callbacks through |
 | RCT-003 | unit | Unmounting while open closes the overlay and cleans up |
 | RCT-004 | unit | Rendering on the server doesn't throw |
+| RCT-005 | unit | `<KetaPayButton>` passes a `url` function that fails, a URL that isn't a checkout, and `load_failed` to `onError` |
 
 ## BPKG: the published package
 
@@ -64,7 +67,8 @@ Layers: **unit** (jsdom, a fake checkout frame, no network), **package** (the pa
 | ID | Layer | Must hold |
 | --- | --- | --- |
 | BE2E-001 | e2e | A checkout session created with `sk_test_` opens in the overlay and `ready` arrives |
-| BE2E-002 | e2e | Paying in the sandbox (the test bank transfer) fires `paid`, and the session is `complete` through the API |
+| BE2E-002 | e2e | Paying in the sandbox (the test bank transfer) fires `onSuccess`, and the session is `complete` through the API |
 | BE2E-003 | e2e | Closing without paying fires `closed`, and the session is still open |
 | BE2E-004 | e2e | An expired or completed session shows the closed state, and closing it fires `closed` |
 | BE2E-005 | e2e | Opened on a phone-sized screen, the overlay is full screen and the Pay button can be reached |
+| BE2E-006 | e2e | A checkout URL with an unknown token fires `onError` with `load_failed` and the overlay closes |
