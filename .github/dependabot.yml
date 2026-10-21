@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      # Conventional commit titles: the required PR title check accepts them, and chore keeps them out of
+      # the changelog.
+      prefix: chore
+      include: scope
+    groups:
+      # Minor and patch updates of dev tools together; each major version gets its own PR so one
+      # breaking change can't block the rest.
+      dev-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+    ignore:
+      # TypeScript 6+/7: wait until typescript-eslint supports it.
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+      # Types must match the oldest Node we support (engines), not the newest.
+      - dependency-name: '@types/node'
+        update-types: [version-update:semver-major]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      # Conventional commit titles: the required PR title check accepts them, and chore keeps them out of
+      # the changelog.
+      prefix: chore
+      include: scope
+    groups:
+      actions:
+        patterns: ['*']
