@@ -1,0 +1,178 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  js.ketapay.com: the script tag build of @ketapay/checkout (js.ketapay.com/v1/checkout.js), served by
+  CloudFront from a private S3 bucket. The ketapay-js "Publish to npm" workflow uploads each release
+  here. Deployed in us-east-1 because CloudFront only reads certificates from there.
+
+  aws cloudformation deploy --region us-east-1 --stack-name ketapay-js-cdn \
+    --template-file infra/cdn.yml --capabilities CAPABILITY_NAMED_IAM --profile ketapay
+
+Parameters:
+  DomainName:
+    Type: String
+    Default: js.ketapay.com
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Default: Z02492491LEC1COPWWEW4 # ketapay.com
+  GitHubRepo:
+    Type: String
+    Default: KetaPay/ketapay-js
+
+Resources:
+  Certificate:
+    Type: AWS::CertificateManager::Certificate
+    Properties:
+      DomainName: !Ref DomainName
+      ValidationMethod: DNS
+      DomainValidationOptions:
+        - DomainName: !Ref DomainName
+          HostedZoneId: !Ref HostedZoneId
+
+  # Private: only CloudFront reads it (origin access control). Versioned, and kept if the stack is
+  # deleted: shops' pages load these files directly, so a published version must never disappear.
+  ScriptsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub 'ketapay-js-${AWS::AccountId}'
+      VersioningConfiguration: { Status: Enabled }
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      OwnershipControls:
+        Rules: [{ ObjectOwnership: BucketOwnerEnforced }]
+      LifecycleConfiguration:
+        Rules:
+          - Id: old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration: { NoncurrentDays: 365 }
+            AbortIncompleteMultipartUpload: { DaysAfterInitiation: 1 }
+
+  ScriptsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref ScriptsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: TlsOnly
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource: [!GetAtt ScriptsBucket.Arn, !Sub '${ScriptsBucket.Arn}/*']
+            Condition: { Bool: { aws:SecureTransport: 'false' } }
+          - Sid: CloudFrontRead
+            Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub '${ScriptsBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+
+  OriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: ketapay-js-cdn
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: js.ketapay.com (KetaPay browser library)
+        Enabled: true
+        Aliases: [!Ref DomainName]
+        ViewerCertificate:
+          AcmCertificateArn: !Ref Certificate
+          SslSupportMethod: sni-only
+          MinimumProtocolVersion: TLSv1.2_2021
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_All
+        Origins:
+          - Id: scripts
+            DomainName: !GetAtt ScriptsBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt OriginAccessControl.Id
+            S3OriginConfig: { OriginAccessIdentity: '' }
+        DefaultCacheBehavior:
+          TargetOriginId: scripts
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          # Managed CachingOptimized: follows each file's Cache-Control (a year for /v1.2.3/, 5 minutes
+          # for /v1/). Managed CORS-with-preflight-and-SecurityHeadersPolicy: CORS for <script
+          # crossorigin> and SRI, plus HSTS, nosniff and friends.
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: eaab4381-ed33-4a86-88ca-d9558dc6cd63
+          Compress: true
+
+  DnsRecord:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: !Ref DomainName
+          Type: A
+          # CloudFront's fixed hosted zone id for alias records
+          AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 }
+        - Name: !Ref DomainName
+          Type: AAAA
+          AliasTarget: { DNSName: !GetAtt Distribution.DomainName, HostedZoneId: Z2FDTNDATAQYW2 }
+
+  # Only the publish job of the ketapay-js "Publish to npm" workflow, which runs in the `publish`
+  # environment (dudox's approval). It can add and overwrite but never delete; the workflow refuses
+  # to overwrite a published version, and bucket versioning keeps every earlier copy.
+  UploadRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: ketapay-js-cdn-upload
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Sub 'arn:aws:iam::${AWS::AccountId}:oidc-provider/token.actions.githubusercontent.com'
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: sts.amazonaws.com
+                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepo}:environment:publish'
+      Policies:
+        - PolicyName: upload
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt ScriptsBucket.Arn
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject]
+                Resource: !Sub '${ScriptsBucket.Arn}/*'
+              - Effect: Allow
+                Action: cloudfront:CreateInvalidation
+                Resource: !Sub 'arn:aws:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+              # The workflow reads the bucket and distribution from this stack's outputs
+              - Effect: Allow
+                Action: cloudformation:DescribeStacks
+                Resource: !Ref AWS::StackId
+
+Outputs:
+  Url:
+    Value: !Sub 'https://${DomainName}'
+  BucketName:
+    Value: !Ref ScriptsBucket
+  DistributionId:
+    Value: !Ref Distribution
+  UploadRoleArn:
+    Value: !GetAtt UploadRole.Arn

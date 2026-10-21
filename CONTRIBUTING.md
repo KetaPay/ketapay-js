@@ -14,6 +14,7 @@ src/
 └── errors.ts     KetaPayCheckoutError
 test/             unit tests in jsdom, one file per area; e2e/ runs real browsers through Playwright
 scripts/          catalogue sync and hash check, package smoke test, test report
+infra/cdn.yml     the js.ketapay.com stack
 ```
 
 `src` is browser code: ESLint blocks `node:*` imports, and nothing may touch `window` or `document` until `open` is called (server rendering imports this package).
@@ -64,9 +65,18 @@ The last two versions of Chrome, Edge, Firefox and Safari, and Safari on iOS 15 
 
 Semantic versioning, automated by Release Please, exactly like the other KetaPay SDKs: conventional commits, a release PR on every push to `main`, merging it tags the version, and the manual **Publish to npm** workflow (dudox only, `publish` environment) runs CI and E2E on the tag, smoke-tests the package and publishes with provenance. Pre-releases go under the `next` dist-tag.
 
-The CDN copy (`js.ketapay.com/v1.2.3/checkout.js`, and `/v1/checkout.js` following the newest `1.x`) is uploaded by the same workflow once the `js.ketapay.com` stack exists. Published versions are never changed.
+The same workflow uploads the script tag build to **js.ketapay.com** before publishing to npm: `/v1.2.3/checkout.js` (cached for a year, never changed again; a re-run with different bytes fails) and, for stable releases, `/v1/checkout.js` (cached for 5 minutes, follows the newest `1.x`). Pre-releases only get their exact path.
 
-Switches (repo variables): `RELEASES_ENABLED` and `NPM_PUBLISH_ENABLED`.
+The CDN is its own stack, `infra/cdn.yml` (S3 + CloudFront + certificate + DNS in us-east-1), deployed once by hand:
+
+```sh
+aws cloudformation deploy --region us-east-1 --stack-name ketapay-js-cdn \
+  --template-file infra/cdn.yml --capabilities CAPABILITY_NAMED_IAM --profile ketapay
+```
+
+Then set the repo variable `CDN_UPLOAD_ROLE_ARN` to the stack's `UploadRoleArn` output. Only the publish job (environment `publish`) can use that role; it can upload but never delete.
+
+Switches (repo variables): `RELEASES_ENABLED`, `NPM_PUBLISH_ENABLED` and `CDN_UPLOAD_ROLE_ARN`.
 
 ## Style
 
