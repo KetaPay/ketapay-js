@@ -9,7 +9,8 @@
 #
 # 3b. Uploads the script tag build to js.ketapay.com (stack ketapay-js-cdn, infra/cdn.yml) before npm:
 #     /v1.2.3/checkout.js (never changed again) and, for stable releases, /v1/checkout.js. Needs the
-#     repo variable CDN_UPLOAD_ROLE_ARN (the stack's UploadRoleArn output); without it, npm only.
+#     CDN_UPLOAD_ROLE_ARN from Infisical (ketapay-sdks, prod; the stack's UploadRoleArn output); without it,
+#     npm only.
 #
 # Auth: NPM_TOKEN from Infisical (ketapay-sdks, prod) when set, otherwise npm Trusted Publishing.
 # Provenance is on: npm links each version to the exact workflow run and commit that built it.
@@ -120,13 +121,13 @@ jobs:
         run: npm run smoke:pack
       # js.ketapay.com (stack ketapay-js-cdn, infra/cdn.yml). Before npm, so a failed upload publishes nothing.
       - name: Sign in to AWS for the CDN
-        if: vars.CDN_UPLOAD_ROLE_ARN != ''
+        if: env.CDN_UPLOAD_ROLE_ARN != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.CDN_UPLOAD_ROLE_ARN }}
+          role-to-assume: ${{ env.CDN_UPLOAD_ROLE_ARN }} # from Infisical
           aws-region: us-east-1
       - name: Upload to js.ketapay.com
-        if: vars.CDN_UPLOAD_ROLE_ARN != ''
+        if: env.CDN_UPLOAD_ROLE_ARN != ''
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
           DIST_TAG: ${{ needs.prepare.outputs.dist_tag }}
@@ -167,8 +168,8 @@ jobs:
             [ "$DIST_TAG" = latest ] && echo "- https://js.ketapay.com/$major/checkout.js (cache refreshes within 5 minutes)"
           } >> "$GITHUB_STEP_SUMMARY"
       - name: CDN not set up
-        if: vars.CDN_UPLOAD_ROLE_ARN == ''
-        run: echo "::warning::CDN_UPLOAD_ROLE_ARN is not set, so js.ketapay.com was not updated (npm only)."
+        if: env.CDN_UPLOAD_ROLE_ARN == ''
+        run: echo "::warning::CDN_UPLOAD_ROLE_ARN is not in Infisical (ketapay-sdks, prod), so js.ketapay.com was not updated (npm only)."
       - name: Publish (Trusted Publishing)
         if: env.NPM_TOKEN == ''
         run: npm publish --tag ${{ needs.prepare.outputs.dist_tag }}
