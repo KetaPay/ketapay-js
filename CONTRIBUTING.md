@@ -74,9 +74,9 @@ aws cloudformation deploy --region us-east-1 --stack-name ketapay-js-cdn \
   --template-file infra/cdn.yml --capabilities CAPABILITY_NAMED_IAM --profile ketapay
 ```
 
-Then set the repo variable `CDN_UPLOAD_ROLE_ARN` to the stack's `UploadRoleArn` output. Only the publish job (environment `publish`) can use that role; it can upload but never delete.
+Then add the stack's `UploadRoleArn` output to Infisical as `CDN_UPLOAD_ROLE_ARN` (project `ketapay-sdks`, environment `prod`). Only the publish job (environment `publish`) can use that role; it can upload but never delete.
 
-Switches (repo variables): `RELEASES_ENABLED`, `NPM_PUBLISH_ENABLED` and `CDN_UPLOAD_ROLE_ARN`.
+Switches (repo variables, on/off only): `RELEASES_ENABLED` and `NPM_PUBLISH_ENABLED`. Keys and config (`NPM_TOKEN`, `CDN_UPLOAD_ROLE_ARN`, the E2E settings) live in Infisical, never in GitHub.
 
 ## Style
 
