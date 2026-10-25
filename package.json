@@ -1,6 +1,6 @@
 {
   "name": "@ketapay/checkout",
-  "version": "0.1.0-beta.1",
+  "version": "0.1.0-beta.2",
   "description": "Official browser library for KetaPay checkout",
   "license": "MIT",
   "keywords": [
