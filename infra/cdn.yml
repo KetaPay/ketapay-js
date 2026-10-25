@@ -14,9 +14,11 @@ Parameters:
   HostedZoneId:
     Type: AWS::Route53::HostedZone::Id
     Default: Z02492491LEC1COPWWEW4 # ketapay.com
-  GitHubRepo:
+  GitHubSubject:
     Type: String
-    Default: KetaPay/ketapay-js
+    # The repo uses GitHub's immutable OIDC subject (owner and repo ids), so a renamed or recreated repo can't
+    # reuse the role. Read it with: gh api repos/KetaPay/ketapay-js/actions/oidc/customization/sub
+    Default: repo:KetaPay@251566625/ketapay-js@1428993074
 
 Resources:
   Certificate:
@@ -147,7 +149,7 @@ Resources:
             Condition:
               StringEquals:
                 token.actions.githubusercontent.com:aud: sts.amazonaws.com
-                token.actions.githubusercontent.com:sub: !Sub 'repo:${GitHubRepo}:environment:publish'
+                token.actions.githubusercontent.com:sub: !Sub '${GitHubSubject}:environment:publish'
       Policies:
         - PolicyName: upload
           PolicyDocument:
