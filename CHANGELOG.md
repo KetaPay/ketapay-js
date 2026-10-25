@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-beta.1](https://github.com/KetaPay/ketapay-js/compare/v0.1.0-beta.1...v0.1.0-beta.1) (2026-10-25)
+
+
+### Bug Fixes
+
+* BE2E-003 clicks the page's close, not the loader's ([#8](https://github.com/KetaPay/ketapay-js/issues/8)) ([fd32c6f](https://github.com/KetaPay/ketapay-js/commit/fd32c6fe2194702598ea108407f26b3299cb91b2))
+
 ## 0.1.0-beta.1 (2026-10-22)
 
 
