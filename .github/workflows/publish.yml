@@ -165,7 +165,8 @@ jobs:
             echo "### js.ketapay.com"
             echo
             echo "- https://js.ketapay.com/v$VERSION/checkout.js"
-            [ "$DIST_TAG" = latest ] && echo "- https://js.ketapay.com/$major/checkout.js (cache refreshes within 5 minutes)"
+            # An if, not `[ ] && echo`: for a pre-release that test is the step's last command and would fail it.
+            if [ "$DIST_TAG" = latest ]; then echo "- https://js.ketapay.com/$major/checkout.js (cache refreshes within 5 minutes)"; fi
           } >> "$GITHUB_STEP_SUMMARY"
       - name: CDN not set up
         if: env.CDN_UPLOAD_ROLE_ARN == ''
