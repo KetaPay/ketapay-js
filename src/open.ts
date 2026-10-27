@@ -71,8 +71,10 @@ export function open(options: CheckoutOptions): CheckoutHandle {
       ready = true
       clearTimers()
       overlay.reveal()
-      overlay.hideCloseButton()
-      if (document.activeElement === closeButton) iframe.focus()
+      // Moving the close drops its focus, so check before
+      const closeHadFocus = document.activeElement === closeButton
+      overlay.dockCloseButton()
+      if (closeHadFocus) iframe.focus()
       call(options.onReady)
     } else if (data.type === 'paid' && !paid) {
       paid = true
@@ -123,7 +125,7 @@ export function open(options: CheckoutOptions): CheckoutHandle {
     document.removeEventListener('focusin', onFocus)
     media?.removeEventListener?.('change', onLayout)
     iframe.removeEventListener('load', onLoad)
-    root.remove()
+    overlay.remove()
     document.documentElement.style.overflow = scroll[0]
     document.body.style.overflow = scroll[1]
     previousFocus?.focus?.()
