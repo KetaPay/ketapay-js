@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.0-beta.3](https://github.com/KetaPay/ketapay-js/compare/v0.1.0-beta.2...v0.1.0-beta.3) (2026-10-28)
+
+
+### Features
+
+* **overlay:** fade the backdrop and pop the card in when ready ([#14](https://github.com/KetaPay/ketapay-js/issues/14)) ([757bfe4](https://github.com/KetaPay/ketapay-js/commit/757bfe48228742c1ff7dec685e40f6da8229d739))
+
 ## [0.1.0-beta.2](https://github.com/KetaPay/ketapay-js/compare/v0.1.0-beta.1...v0.1.0-beta.2) (2026-10-25)
 
 
