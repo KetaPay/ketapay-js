@@ -106,19 +106,36 @@ describe('the overlay', () => {
     const modal = overlay()!.firstElementChild as HTMLElement
     expect(overlay()!.style.alignItems).toBe('center')
     expect(overlay()!.style.justifyContent).toBe('center')
-    expect(modal.style.maxWidth).toBe('1040px')
-    expect(modal.style.height).toMatch(/^min\(720px, (calc\()?100% - 56px\)?\)$/)
+    expect(modal.style.maxWidth).toBe('840px')
+    expect(modal.style.height).toMatch(/^min\(600px, (calc\()?100% - 56px\)?\)$/)
 
     media.resize(true)
     expect(modal.style.height).toBe('100%')
     media.resize(false)
-    expect(modal.style.maxWidth).toBe('1040px')
+    expect(modal.style.maxWidth).toBe('840px')
   })
 
   it('[UI-005] works where matchMedia is missing (treated as a large screen)', () => {
     vi.stubGlobal('matchMedia', undefined)
     openCheckout()
-    expect((overlay()!.firstElementChild as HTMLElement).style.maxWidth).toBe('1040px')
+    expect((overlay()!.firstElementChild as HTMLElement).style.maxWidth).toBe('840px')
+  })
+
+  it('[UI-005] puts the loader and its close button on the backdrop, not on the card that is still hidden', () => {
+    openCheckout()
+    expect(overlay()!.querySelector('[role="status"]')!.parentElement).toBe(overlay())
+    expect(closeButton().parentElement).toBe(overlay())
+    expect(closeButton().style.top).toBe('16px')
+    expect(closeButton().style.right).toBe('16px')
+  })
+
+  it("[UI-005] on a phone the checkout draws its own close, so the overlay's goes once it is ready", () => {
+    const media = screen(true)
+    openCheckout()
+    post(event('ready'))
+    expect(closeButton().style.display).toBe('none')
+    media.resize(false)
+    expect(closeButton().style.display).toBe('block')
   })
 
   it('[UI-006] is a labelled modal dialog with a titled frame', () => {

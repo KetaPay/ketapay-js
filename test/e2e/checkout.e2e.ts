@@ -69,12 +69,8 @@ test('[BE2E-003] closing without paying fires closed and leaves the session open
   await openShop(page, session.url)
   await expect.poll(() => events(page)).toContain('ready')
 
-  // The loader keeps its own close over the page until the card form has drawn; click the page's one,
-  // which Playwright waits on until the loader has gone.
-  await checkout(page)
-    .getByRole('region', { name: 'Order summary' })
-    .getByRole('button', { name: 'Close checkout' })
-    .click()
+  // On a large screen the overlay's close sits above the card (the checkout draws its own only on a phone)
+  await page.getByRole('button', { name: 'Close checkout' }).click()
   await expect(overlay(page)).toHaveCount(0)
   expect(await events(page)).toEqual(['ready', 'closed'])
   expect(await result(page)).toBe('closed')
@@ -88,7 +84,7 @@ test('[BE2E-004] a completed session shows its closed state, and closing it fire
   await expect.poll(() => events(page)).toContain('ready')
 
   await expect(checkout(page).getByRole('button', { name: /Pay now|Proceed/ })).toHaveCount(0)
-  await checkout(page).getByRole('button', { name: 'Close checkout' }).click()
+  await page.getByRole('button', { name: 'Close checkout' }).click()
   await expect.poll(() => events(page)).toEqual(['ready', 'closed'])
 })
 

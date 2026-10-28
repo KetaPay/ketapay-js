@@ -34,19 +34,22 @@ describe('messages from the checkout', () => {
     expect(overlay()).not.toBeNull()
   })
 
-  it('[MSG-003] ready calls onReady once, shows the checkout and removes the loader', () => {
+  it('[MSG-003] ready calls onReady once, pops the card in, removes the loader and puts the close on the card', () => {
     const onReady = vi.fn()
     openCheckout({ onReady })
     expect(spinner()).not.toBeNull()
-    expect(frame().style.opacity).toBe('0')
+    const card = frame().parentElement as HTMLElement
+    expect(card.style.opacity).toBe('0')
 
     post(event('ready'))
     post(event('ready'))
     expect(onReady).toHaveBeenCalledOnce()
     expect(spinner()).toBeNull()
-    expect(frame().style.opacity).toBe('1')
-    // The checkout draws its own close button from here on.
-    expect(closeButton().style.display).toBe('none')
+    expect(card.style.opacity).toBe('1')
+    // The close moves above the card's top-right corner.
+    expect(closeButton().parentElement).toBe(card.parentElement)
+    expect(closeButton().style.display).toBe('block')
+    expect(closeButton().style.top).toBe('-40px')
   })
 
   it('[MSG-004] paid calls onSuccess once and resolves the result, however often it arrives', async () => {
