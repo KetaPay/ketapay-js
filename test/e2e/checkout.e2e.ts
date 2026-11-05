@@ -2,8 +2,10 @@ import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { configured, createSession, getSession, payWithTestHelper } from './env.js'
 
-// A business's page, served by Playwright itself: the script tag build, nothing else.
-const SHOP = 'https://shop.example/'
+// A business's page, served by Playwright itself: the script tag build, nothing else. On localhost
+// because a test checkout may be framed there with no setup; any other site must be on the
+// business's allowed list (ENG-556).
+const SHOP = 'http://localhost:4599/'
 
 declare global {
   interface Window {
@@ -54,10 +56,10 @@ test('[BE2E-002] paying in the sandbox fires onSuccess and completes the session
   await openShop(page, session.url)
   await expect.poll(() => events(page)).toContain('ready')
 
-  const frame = checkout(page)
-  await frame.getByText('Bank transfer', { exact: true }).click()
-  await frame.getByRole('button', { name: 'Proceed' }).click()
-  await frame.getByRole('button', { name: /sent the money/ }).click()
+  // Bank transfer is the e2e business's only method, so the page goes straight to the account.
+  await checkout(page)
+    .getByRole('button', { name: /sent the money/ })
+    .click()
 
   await expect.poll(() => events(page)).toContain('success')
   expect(await result(page)).toBe('success')
@@ -83,7 +85,9 @@ test('[BE2E-004] a completed session shows its closed state, and closing it fire
   await openShop(page, session.url)
   await expect.poll(() => events(page)).toContain('ready')
 
-  await expect(checkout(page).getByRole('button', { name: /Pay now|Proceed/ })).toHaveCount(0)
+  await expect(
+    checkout(page).getByRole('button', { name: /Pay now|Proceed|Continue to payment|sent the money/ }),
+  ).toHaveCount(0)
   await page.getByRole('button', { name: 'Close checkout' }).click()
   await expect.poll(() => events(page)).toEqual(['ready', 'closed'])
 })
@@ -95,9 +99,12 @@ test('[BE2E-005] on a phone the overlay fills the screen and the pay button can 
 
   const viewport = page.viewportSize()!
   // The frame itself, not just the dimmed backdrop, covers the whole screen.
-  const frameBox = await page.locator('iframe[title="KetaPay checkout"]').boundingBox()
-  expect(frameBox).toEqual({ x: 0, y: 0, width: viewport.width, height: viewport.height })
-  const pay = checkout(page).getByRole('button', { name: /Pay now|Proceed/ })
+  // Polled, because the card is still popping in just after ready.
+  await expect
+    .poll(() => page.locator('iframe[title="KetaPay checkout"]').boundingBox())
+    .toEqual({ x: 0, y: 0, width: viewport.width, height: viewport.height })
+  // A phone shows the order first, and this button is the way on to paying.
+  const pay = checkout(page).getByRole('button', { name: 'Continue to payment' })
   await pay.scrollIntoViewIfNeeded()
   const box = await pay.boundingBox()
   expect(box!.y + box!.height).toBeLessThanOrEqual(viewport.height)
