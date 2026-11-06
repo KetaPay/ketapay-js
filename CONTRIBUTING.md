@@ -55,7 +55,7 @@ New scenario: add the row in the documentation repo first, `npm run sync-catalog
 
 Settings: `KETAPAY_E2E_BASE_URL` and `KETAPAY_E2E_SECRET_KEY` (see `test/e2e/env.ts`). The checkout URL the API returns must be reachable from the machine running the browsers. Run `npm run build` first, then `npm run test:e2e`.
 
-The **E2E** workflow runs on every merge to `main`, nightly and by hand, reading the settings from Infisical (`ketapay-sdks`, staging); until they exist it reports "not configured" and passes. **Publish to npm** runs it on the release tag and refuses a stable release unless it passed.
+The **E2E** workflow runs on every merge to `main`, on pull requests that change the SDK or spec, nightly and by hand, reading the settings from Infisical (`ketapay-sdks`, staging); until they exist it reports "not configured" and passes. **Publish to npm** runs it on the release tag and refuses a stable release unless it passed.
 
 ## Supported browsers
 
