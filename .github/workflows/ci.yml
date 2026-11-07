@@ -15,6 +15,13 @@ permissions:
   contents: read
 
 # Each job is its own check on the PR, so you can see at a glance which kind of test failed.
+# A newer push to a PR, or a newer merge into main, cancels the CI run it replaces: the newest
+# commit contains everything before it. Runs called by Publish or Release keep their own group and
+# are never cancelled.
+concurrency:
+  group: ci-${{ github.event.pull_request.number || (github.event_name == 'push' && github.workflow == 'CI' && github.ref) || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' || (github.event_name == 'push' && github.workflow == 'CI') }}
+
 jobs:
   pr-title:
     name: PR title
